@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>课间游戏厅 · 战术竞技场</title>
+<style>
+:root{--bg:#101522;--panel:#1a2335;--panel2:#222e45;--line:#34435f;--text:#edf3ff;--muted:#9eacc5;--a:#61d6c5;--b:#ffbd69;--danger:#ff7185}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0%,#23314b 0,#101522 48%);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+main{max-width:1100px;margin:auto;padding:24px 18px 48px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:clamp(26px,5vw,40px);margin:0;letter-spacing:-1px}.sub{color:var(--muted);margin:4px 0 0}.tag{border:1px solid var(--line);padding:6px 10px;border-radius:99px;color:var(--a);font-size:12px}
+.layout{display:grid;grid-template-columns:310px 1fr;gap:16px;margin-top:20px}.panel{background:linear-gradient(160deg,#1d2940,#171f30);border:1px solid var(--line);border-radius:18px;padding:17px;box-shadow:0 12px 30px #0003}
+h2{font-size:17px;margin:0 0 12px}label{display:block;color:var(--muted);font-size:12px;margin:12px 0 5px}
+input,select,button{font:inherit}input,select{width:100%;background:#101827;border:1px solid var(--line);border-radius:10px;padding:11px;color:var(--text);outline:none}
+button{border:0;border-radius:10px;padding:10px 13px;cursor:pointer;font-weight:700;background:var(--a);color:#10202a;transition:.15s}button:hover{filter:brightness(1.08);transform:translateY(-1px)}button.secondary{background:#2c3a54;color:var(--text);border:1px solid var(--line)}button.warn{background:#ffd08a;color:#33220c}button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.status{margin-top:12px;padding:10px;border-radius:10px;background:#101827;color:var(--muted);font-size:13px;min-height:42px}.status.good{color:var(--a)}.status.bad{color:var(--danger)}
+.roomcode{font:700 24px ui-monospace,monospace;letter-spacing:4px;color:var(--b);word-break:break-all}
+.games{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.game{background:#121b2b;border:1px solid var(--line);border-radius:13px;padding:12px;text-align:left;color:var(--text);cursor:pointer}.game strong{display:block;font-size:14px}.game small{color:var(--muted)}.game.active{border-color:var(--a);box-shadow:inset 0 0 0 1px var(--a)}
+.game:disabled{opacity:.5;cursor:not-allowed}.arena{min-width:0}.arenahead{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap}.scores{display:flex;gap:10px;color:var(--muted);font-size:13px}.scores b{color:var(--text)}
+canvas{width:100%;aspect-ratio:16/9;display:block;background:#0b1220;border:1px solid #3a4964;border-radius:14px;touch-action:none;}
+.help{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:10px}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.controls button{background:#2a3852;color:var(--text);border:1px solid var(--line);min-width:48px}
+.note{color:var(--muted);font-size:12px;margin-top:12px}.footer{margin-top:16px;color:#8291aa;font-size:12px}
+@media(max-width:800px){.layout{grid-template-columns:1fr}.games{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <div><h1>🎮 课间游戏厅</h1><p class="sub">CLASSROOM ARCADE · 战术竞技</p></div>
+    <span class="tag">全图透视 · 传送门</span>
+  </div>
+  <div class="layout">
+    <aside class="panel">
+      <h2>连接房间</h2>
+      <label>你的昵称</label><input id="nickname" maxlength="14" value="玩家">
+      
+      <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-top:10px">
+        <button id="solo" class="warn" style="width:100%">💻 单机打电脑 (无需网络)</button>
+        <select id="difficulty" style="display:none">
+            <option value="easy">🤖 AI难度：简单</option>
+            <option value="normal" selected>🤖 AI难度：普通</option>
+            <option value="hard">🤖 AI难度：困难</option>
+        </select>
+      </div>
+      
+      <div style="text-align:center;color:var(--muted);font-size:12px;margin:10px 0">— 或者 联机对战 —</div>
+
+      <div class="actions">
+        <button id="create">创建房间</button>
+        <button id="copy" class="secondary" disabled>复制房间码</button>
+      </div>
+      <label>加入同桌的房间码</label><input id="joincode" placeholder="输入对方的 4 位数字码" maxlength="4">
+      <button id="join" class="secondary" style="width:100%;margin-top:8px">加入房间</button>
+      <div class="status" id="status">尚未连接。一个人创建房间，另一个人输入房间码加入。</div>
+      <label>当前房间码</label><div class="roomcode" id="roomcode">————</div>
+      <p class="note">联机使用 PeerJS / WebRTC。首次连接可能需要几秒钟。</p>
+      <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+      <h2>选择游戏</h2>
+      <div class="games">
+        <button class="game active" data-game="tank"><strong>🚜 坦克对战</strong><small>全图视野、血量装填、道具</small></button>
+        <button class="game" data-game="space"><strong>🚀 太空对战</strong><small>双飞船竞技</small></button>
+        <button class="game" data-game="territory"><strong>🗺️ 领土争夺</strong><small>占领据点</small></button>
+        <button class="game" data-game="race"><strong>🏁 双人竞速</strong><small>冲向终点</small></button>
+      </div>
+      <button id="start" class="warn" style="width:100%;margin-top:12px" disabled>开始本局</button>
+      <p class="note">只有房主可以切换游戏和开始新一局。单机模式下自动视为房主。</p>
+    </aside>
+    <section class="panel arena">
+      <div class="arenahead">
+        <div><h2 id="gametitle">🚜 坦克对战</h2><div class="sub" id="gamestatus">等待开始</div></div>
+        <div class="scores"><span>你：<b id="myscore">0</b></span><span>对手：<b id="opscore">0</b></span></div>
+      </div>
+      <canvas id="game" width="960" height="540"></canvas>
+      <div class="help">
+        <span>移动：W A S D</span>
+        <span>旋转炮管：Q / E</span>
+        <span>射击 / 准备重开：空格</span>
+      </div>
+      <div class="controls">
+        <button data-key="w">W</button><button data-key="a">A</button><button data-key="s">S</button><button data-key="d">D</button>
+        <button data-key="q" style="color:var(--b)">Q 左转</button><button data-key="e" style="color:var(--b)">E 右转</button>
+        <button data-key=" " style="background:var(--danger)">空格 开火</button>
+      </div>
+      <div class="footer">提示：利用传送门进行快速转移。拾取“速”字道具可以大幅缩减装填时间。</div>
+    </section>
+  </div>
+</main>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+(() => {
+const $=id=>document.getElementById(id), canvas=$('game'),ctx=canvas.getContext('2d');
+const W=960,H=540, colors=['#61d6c5','#ffbd69'];
+let peer=null,conn=null,isHost=false,isSinglePlayer=false,connected=false,roomId='',role=0,game='tank',state=null,keys={},lastSend=0,raf=0;
+let remoteInput={};
+const names={tank:'🚜 坦克对战',space:'🚀 太空对战',territory:'🗺️ 领土争夺',race:'🏁 双人竞速'};
+
+// --- 复杂对称竞技场生成 ---
+function generateRandomMaze() {
+    const MAZE_W = 960, MAZE_H = 540, THICK = 24;
+    let maze = [
+        {x: 0, y: 0, w: MAZE_W, h: 20}, {x: 0, y: MAZE_H-20, w: MAZE_W, h: 20},
+        {x: 0, y: 0, w: 20, h: MAZE_H}, {x: MAZE_W-20, y: 0, w: 20, h: MAZE_H}
+    ];
+
+    const cx = W/2, cy = H/2;
+    maze.push({x: cx - 120, y: cy - 12, w: 80, h: THICK});
+    maze.push({x: cx + 40, y: cy - 12, w: 80, h: THICK});
+    maze.push({x: cx - 12, y: cy - 120, w: THICK, h: 80});
+    maze.push({x: cx - 12, y: cy + 40, w: THICK, h: 80});
+    maze.push({x: cx - 12, y: cy - 12, w: THICK, h: THICK});
+
+    let leftBlocks = [];
+    for (let i = 0; i < 16; i++) {
+        let w, h;
+        let type = Math.random();
+        if (type < 0.5) { w = 120 + Math.floor(Math.random() * 80); h = THICK; }
+        else if (type < 0.85) { w = THICK; h = 120 + Math.floor(Math.random() * 80); }
+        else { w = 60; h = 60; }
+
+        let x = 40 + Math.floor(Math.random() * (420 - w - 40));
+        let y = 40 + Math.floor(Math.random() * (500 - h - 40));
+
+        let ccx = Math.max(x, Math.min(100, x + w));
+        let ccy = Math.max(y, Math.min(270, y + h));
+        if (Math.hypot(100 - ccx, 270 - ccy) < 80) continue;
+
+        let overlap = false;
+        for (let m of maze.concat(leftBlocks)) {
+            if (x < m.x + m.w + 30 && x + w > m.x - 30 && y < m.y + m.h + 30 && y + h > m.y - 30) {
+                overlap = true; break;
+            }
+        }
+        if (!overlap) leftBlocks.push({x, y, w, h});
+    }
+
+    for (let b of leftBlocks) {
+        maze.push(b);
+        let rx = MAZE_W - (b.x + b.w), ry = MAZE_H - (b.y + b.h);
+        maze.push({x: rx, y: ry, w: b.w, h: b.h});
+    }
+    return maze;
+}
+
+function status(msg,type=''){ $('status').textContent=msg;$('status').className='status '+type; }
+function send(data){if(!isSinglePlayer && conn&&conn.open)conn.send(data)}
+
+function makePeer(customId) {
+    return new Promise((resolve, reject) => {
+        let p = new Peer(customId, { debug: 0 });
+        p.on('open', id => { peer = p; resolve(id); });
+        p.on('error', err => { if (err.type !== 'peer-unavailable') p.destroy(); reject(err); });
+        p.on('disconnected', () => status('网络连接中断…', 'bad'));
+    });
+}
+
+function setConnected(){connected=true;$('start').disabled=!isHost;document.querySelectorAll('.game').forEach(b=>b.disabled=!isHost);status('已连接！你们可以开始游戏了。','good');$('gamestatus').textContent='两名玩家已就位';}
+
+function initState(){
+  let mazeData = game==='tank' ? generateRandomMaze() : [];
+  let portals = [{x: 240, y: 150}, {x: 720, y: 390}]; // 兜底
+  if(game==='tank') {
+      // 动态安全生成传送门
+      let p1 = null, p2 = null, tries = 0;
+      while ((!p1 || !p2) && tries < 300) {
+          tries++;
+          let x = 60 + Math.random() * 840;
+          let y = 60 + Math.random() * 420;
+          // 检查是否在墙里
+          let isWall = false;
+          for (let w of mazeData) {
+              let closestX = Math.max(w.x, Math.min(x, w.x + w.w));
+              let closestY = Math.max(w.y, Math.min(y, w.y + w.h));
+              if ((x - closestX)**2 + (y - closestY)**2 < 40**2) { isWall = true; break; }
+          }
+          if (!isWall) {
+              if (!p1) p1 = {x, y};
+              else if (Math.hypot(x - p1.x, y - p1.y) > 350) p2 = {x, y};
+          }
+      }
+      if (p1 && p2) portals = [p1, p2];
+  }
+
+  return {
+    game,started:true,over:false,winner:-1,score:[0,0],countdown:-1,ready:[false,false],
+    players:[
+      {x:100,y:270,a:0,hp:100,maxHp:100,reloadMax:1.5,reloadTimer:0,stun:0,fastReload:0,scatter:0,freeze:0,bounce:0,portalCd:0},
+      {x:860,y:270,a:Math.PI,hp:100,maxHp:100,reloadMax:1.5,reloadTimer:0,stun:0,fastReload:0,scatter:0,freeze:0,bounce:0,portalCd:0}
+    ],
+    bullets:[],
+    maze: mazeData,
+    portals: portals,
+    items: [],
+    itemTimer: 2.0
+  };
+}
+
+function hostStart(){if(!isHost||(!connected && !isSinglePlayer))return;state=initState();game=state.game;send({type:'state',state});$('gamestatus').textContent='进行中 · '+names[game];}
+function chooseGame(g){if(!isHost)return;game=g;document.querySelectorAll('.game').forEach(b=>b.classList.toggle('active',b.dataset.game===g));$('gametitle').textContent=names[g];if(connected)send({type:'game',game:g});state=null;draw();}
+document.querySelectorAll('.game').forEach(b=>b.onclick=()=>chooseGame(b.dataset.game));
+
+$('solo').onclick=()=>{
+  isSinglePlayer = true; isHost = true; connected = true; role = 0;
+  $('solo').disabled = true; $('solo').textContent = '💻 已进入单机模式';
+  $('difficulty').style.display = 'block';
+  $('create').disabled = true; $('join').disabled = true;
+  $('start').disabled = false;
+  document.querySelectorAll('.game').forEach(b=>b.disabled = false);
+  $('gamestatus').textContent = '单机模式准备就绪，点击下方开始';
+  status('单机模式已启动！选择难度并点击“开始”。', 'good');
+  $('roomcode').textContent = 'AI';
+};
+
+$('create').onclick=async()=>{
+  if(isSinglePlayer) return;
+  $('create').disabled=true; status('正在创建房间…');
+  isHost=true; role=0;
+  let success = false; let retries = 5;
+  while(!success && retries > 0) {
+      let code = Math.floor(1000 + Math.random() * 9000).toString(); 
+      try { roomId = await makePeer(code); success = true; }
+      catch (e) {
+          if(e.type === 'unavailable-id') { retries--; continue; } 
+          status('创建失败：'+e.message,'bad'); $('create').disabled=false; return;
+      }
+  }
+  if(success) {
+      $('roomcode').textContent=roomId; $('copy').disabled=false;
+      status('房间已创建。把 4 位房间码发给同桌。','good');
+      peer.on('connection',c=>{if(conn){c.close();return;}conn=c;wire();});
+      $('start').disabled=true;
+  } else { status('尝试多次未能创建，请检查网络。', 'bad'); $('create').disabled=false; }
+};
+
+$('copy').onclick=async()=>{try{await navigator.clipboard.writeText(roomId);status('房间码已复制。','good')}catch(e){status('复制失败，请手动复制。') }};
+
+$('join').onclick=async()=>{
+  if(isSinglePlayer) return;
+  const id=$('joincode').value.trim();
+  if(!id || id.length !== 4) return status('请输入 4 位数字房间码。','bad');
+  try{
+      $('join').disabled=true; status('正在连接房间 ' + id + '…');
+      isHost=false; role=1;
+      await makePeer(undefined);
+      conn=peer.connect(id,{reliable:true});
+      wire();
+  }catch(e){ status('连接失败：'+e.message,'bad'); $('join').disabled=false; }
+};
+
+function wire(){
+    conn.on('open',()=>{ setConnected();send({type:'hello',name:$('nickname').value||'玩家'});if(isHost)send({type:'game',game}); });
+    conn.on('data',m=>{
+        if(!m)return;
+        if(isHost){
+            if(m.type==='input') remoteInput=m.input||{};
+            if(m.type==='toggle_ready' && state && state.over) { state.ready[1] = !state.ready[1]; send({type:'state',state}); }
+        } else {
+            if(m.type==='state'){state=m.state;game=state.game;updateGameUI();}
+            if(m.type==='game'){game=m.game;state=null;document.querySelectorAll('.game').forEach(b=>b.classList.toggle('active',b.dataset.game===game));$('gametitle').textContent=names[game];draw();}
+            if(m.type==='hello')$('gamestatus').textContent='已连接对手：'+m.name;
+        }
+    });
+    conn.on('close',()=>{connected=false;status('对方已断开连接。','bad');$('gamestatus').textContent='等待对手重新连接';});
+}
+
+function keyName(k){return k===' '||k==='Spacebar'?' ':k.toLowerCase();}
+window.addEventListener('keydown',e=>{
+    const k=keyName(e.key);
+    if(['w','a','s','d','q','e','arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
+    
+    if (k === ' ' && state && state.over) {
+        if (isHost) { state.ready[0] = !state.ready[0]; send({type:'state', state}); }
+        else { send({type:'toggle_ready'}); }
+        return; 
+    }
+    keys[k]=true;
+});
+window.addEventListener('keyup',e=>{keys[keyName(e.key)]=false;});
+window.addEventListener('blur',()=>{keys={};});
+
+document.querySelectorAll('[data-key]').forEach(b=>{
+    const k=b.dataset.key;
+    const down=e=>{e.preventDefault();keys[k]=true},up=e=>{e.preventDefault();keys[k]=false};
+    b.addEventListener('pointerdown',down);
+    ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,up));
+});
+
+function getInput(){
+ 
+  return {
+    f:(keys['w']||keys['arrowup'])?1:0,
+    b:(keys['s']||keys['arrowdown'])?1:0,
+    l:(keys['a']||keys['arrowleft'])?1:0,
+    r:(keys['d']||keys['arrowright'])?1:0,
+    ql:!!keys['q'], qr:!!keys['e'],
+    fire:!!keys[' ']
+  };
+}
+
+// --- 单机 AI ---
+function aiInput(p, foe, st, dt){
+  const diff = $('difficulty').value;
+  const speed = diff==='easy'?0.55: diff==='normal'?0.85:1.0;
+  let a=0,rot=0,fire=false;
+  if(foe && !st.over){
+    const want=Math.atan2(foe.y-p.y, foe.x-p.x);
+    let d=want-p.a;
+    while(d>Math.PI)d-=Math.PI*2; while(d<-Math.PI)d+=Math.PI*2;
+    if(d<-0.12)rot=-1; else if(d>0.12)rot=1;
+    else if(Math.random()<0.7*speed)fire=true;
+    // 拉近距离或找道具
+    const dist=Math.hypot(foe.x-p.x,foe.y-p.y);
+    if(dist>260){a=1;}
+    else if(dist<140 && diff!=='easy'){a=-1;}
+    else if(diff==='hard'){
+      // 简单走位的横向绕圈
+      p._strafe = (p._strafe||1);
+      if(Math.random()<0.01)p._strafe*=-1;
+      a = 0.4*p._strafe;
+    }
+    if(p.reloadTimer>0)fire=false;
+  }
+  return {f:a>0?a:0,b:a<0?-a:0,l:0,r:0,ql:rot<0,qr:rot>0,fire};
+}
+
+function rectCircleCollide(r,cx,cy,rad){
+  const nx=Math.max(r.x,Math.min(cx,r.x+r.w)), ny=Math.max(r.y,Math.min(cy,r.y+r.h));
+  const dx=cx-nx,dy=cy-ny; return dx*dx+dy*dy<rad*rad;
+}
+
+function updatePlayer(p,input,dt,st){
+  if(p.hp<=0)return;
+  if(p.stun>0){p.stun-=dt;}
+  const speed = p.stun>0?60:150;
+  let mx=0,my=0;
+  if(input.f)mx+=1; if(input.b)mx-=1; if(input.l)my-=1; if(input.r)my+=1;
+  if(mx||my){
+    const len=Math.hypot(mx,my); mx/=len;my/=len;
+    let nx=p.x+mx*speed*dt, ny=p.y+my*speed*dt;
+    let blocked=false;
+    for(const w of st.maze){ if(rectCircleCollide(w,nx,ny,14)){blocked=true;break;} }
+    if(!blocked){p.x=nx;p.y=ny;}
+    else{
+      blocked=false;
+      for(const w of st.maze){ if(rectCircleCollide(w,nx,p.y,14)){blocked=true;break;} }
+      if(!blocked)p.x=nx;
+      else{
+        blocked=false;
+        for(const w of st.maze){ if(rectCircleCollide(w,p.x,ny,14)){blocked=true;break;} }
+        if(!blocked)p.y=ny;
+      }
+    }
+    p.x=Math.max(26,Math.min(W-26,p.x)); p.y=Math.max(26,Math.min(H-26,p.y));
+  }
+  if(input.ql)p.a-=2.6*dt;
+  if(input.qr)p.a+=2.6*dt;
+  p.reloadTimer=Math.max(0,p.reloadTimer-dt);
+  if(p.fastReload>0)p.fastReload-=dt;
+  if(p.freeze>0)p.freeze-=dt;
+  if(p.bounce>0)p.bounce-=dt;
+  if(p.scatter>0)p.scatter-=dt;
+  if(p.portalCd>0)p.portalCd-=dt;
+  // 传送门（冷却 2 秒）
+  if(p.portalCd<=0 && st.portals.length===2){
+    for(let i=0;i<2;i++){
+      const po=st.portals[i];
+      if(Math.hypot(p.x-po.x,p.y-po.y)<24){
+        const t=st.portals[1-i];
+        let blocked=false;
+        for(const w of st.maze){ if(rectCircleCollide(w,t.x,t.y,16)){blocked=true;break;} }
+        if(!blocked){ p.x=t.x;p.y=t.y; }
+        p.portalCd=2; // ★ 传送门冷却 2 秒
+        break;
+      }
+    }
+  }
+  // 拾取道具（双方都能捡地图上的道具，但效果只显示给自己）
+  for(let i=st.items.length-1;i>=0;i--){
+    const it=st.items[i];
+    if(Math.hypot(p.x-it.x,p.y-it.y)<26){
+      if(it.type==='heal')p.hp=Math.min(p.maxHp,p.hp+30);
+      if(it.type==='speed')p.fastReload=5;
+      if(it.type==='scatter')p.scatter=4;
+      if(it.type==='freeze')p.freeze=4;
+      if(it.type==='bounce')p.bounce=4;
+      st.items.splice(i,1);
+    }
+  }
+}
+
+function fireBullet(p,st){
+  const n = p.scatter>0?3:1;
+  for(let i=0;i<n;i++){
+    const off = n===1?0:(i-1)*0.18;
+    st.bullets.push({
+      x:p.x+Math.cos(p.a)*20, y:p.y+Math.sin(p.a)*20,
+      vx:Math.cos(p.a+off)*340, vy:Math.sin(p.a+off)*340,
+      owner:st.players.indexOf(p),
+      life:2.2, bounce:p.bounce>0?1:0, freeze:p.freeze>0
+    });
+  }
+  p.scatter=Math.max(0,p.scatter-1);
+  p.bounce=Math.max(0,p.bounce-1);
+  p.freeze=Math.max(0,p.freeze-1);
+  // ★ 装填时间 1.5 秒（“速”道具再减半）
+  p.reloadTimer = p.fastReload>0 ? p.reloadMax*0.5 : p.reloadMax;
+}
+
+function update(dt){
+  if(!state||!state.started||state.over)return;
+  const inp0 = role===0 ? getInput() : remoteInput;
+  let inp1;
+  if(isSinglePlayer){ inp1 = aiInput(state.players[1], state.players[0], state, dt); }
+  else { inp1 = role===1 ? getInput() : remoteInput; }
+  if(role===1&&!isSinglePlayer){ /* host视角 */ }
+
+  updatePlayer(state.players[0], inp0, dt, state);
+  updatePlayer(state.players[1], inp1, dt, state);
+  if(inp0.fire && state.players[0].reloadTimer<=0)fireBullet(state.players[0],state);
+  if(inp1.fire && state.players[1].reloadTimer<=0)fireBullet(state.players[1],state);
+
+  // 子弹
+  for(let i=state.bullets.length-1;i>=0;i--){
+    const b=state.bullets[i];
+    b.x+=b.vx*dt; b.y+=b.vy*dt; b.life-=dt;
+    let dead = b.life<=0 || b.x<20||b.x>W-20||b.y<20||b.y>H-20;
+    if(!dead){
+      for(const w of state.maze){
+        if(rectCircleCollide(w,b.x,b.y,4)){
+          if(b.bounce>0){
+            // 简易反弹：沿法线翻转速度
+            if(b.x<w.x||b.x>w.x+w.w)b.vx*=-1; else b.vy*=-1;
+            b.bounce--;
+          }else dead=true;
+          break;
+        }
+      }
+    }
+    if(!dead){
+      for(let pi=0;pi<2;pi++){
+        if(pi===b.owner)continue;
+        const t=state.players[pi];
+        if(t.hp>0 && Math.hypot(t.x-b.x,t.y-b.y)<16){
+          t.hp-=12;
+          if(b.freeze)t.stun=1.2;
+          dead=true;
+          if(t.hp<=0){
+            t.hp=0; state.over=true;
+            state.winner=1-pi;
+            state.score[1-pi]++;
+            state.ready=[false,false];
+            $('gamestatus').textContent = '本局结束 · 按空格准备重开';
+          }
+          break;
+        }
+      }
+    }
+    if(dead)state.bullets.splice(i,1);
+  }
+
+  // 双方准备好后重开
+  if(state.over && state.ready[0] && state.ready[1]) hostStart();
+
+  // 道具刷新
+  state.itemTimer-=dt;
+  if(state.itemTimer<=0 && state.items.length<4){
+    state.itemTimer=2.5;
+    const types=['heal','speed','scatter','freeze','bounce'];
+    const tp=types[Math.floor(Math.random()*types.length)];
+    let x=60+Math.random()*840, y=60+Math.random()*420, ok=false, tries=0;
+    while(!ok && tries<200){
+      tries++;
+      ok=true;
+      for(const w of state.maze){ if(rectCircleCollide(w,x,y,30)){ok=false;break;} }
+      if(ok)for(const p of state.players){ if(Math.hypot(p.x-x,p.y-y)<80)ok=false; }
+      if(!ok){x=60+Math.random()*840;y=60+Math.random()*420;}
+    }
+    if(ok)state.items.push({x,y,type:tp});
+  }
+}
+
+// ---------- 渲染 ----------
+function drawTank(p,idx,isMe){
+  ctx.save();
+  ctx.translate(p.x,p.y);
+  ctx.globalAlpha = p.hp<=0?0.35:1;
+  // 车身
+  ctx.fillStyle=colors[idx];
+  ctx.beginPath();ctx.arc(0,0,15,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#0b1220';
+  ctx.beginPath();ctx.arc(0,0,8,0,Math.PI*2);ctx.fill();
+  // 炮管
+  ctx.strokeStyle=colors[idx];ctx.lineWidth=5;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(p.a)*24,Math.sin(p.a)*24);ctx.stroke();
+  ctx.restore();
+  // ★ 血量条（双方均可见）
+  if(p.hp>0){
+    const bw=40, bx=p.x-bw/2, by=p.y-30;
+    ctx.fillStyle='#0008'; ctx.fillRect(bx,by,bw,6);
+    ctx.fillStyle = p.hp/p.maxHp>0.5?'#6fe08a': p.hp/p.maxHp>0.25?'#ffbd69':'#ff7185';
+    ctx.fillRect(bx,by,bw*Math.max(0,p.hp/p.maxHp),6);
+    ctx.fillStyle='#edf3ff'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(Math.max(0,Math.round(p.hp)), p.x, by-3);
+    // ★ 只显示自己的道具效果，不显示对方的
+    if(isMe){
+      ctx.font='11px sans-serif';
+      let badges=[];
+      if(p.fastReload>0)badges.push('速');
+      if(p.scatter>0)badges.push('散');
+      if(p.freeze>0)badges.push('冰');
+      if(p.bounce>0)badges.push('弹');
+      if(p.stun>0)badges.push('晕');
+      if(badges.length){ctx.fillStyle='#61d6c5';ctx.fillText(badges.join(' '),p.x,p.y+32);}
+    }
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // 网格底纹
+  ctx.strokeStyle='#ffffff08';ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+  if(!state||!state.maze){
+    ctx.fillStyle='#9eacc5';ctx.font='16px sans-serif';ctx.textAlign='center';
+    ctx.fillText(isHost?'点击左侧“开始本局”开始游戏':'等待房主开始…', W/2, H/2);
+    return;
+  }
+  // 迷宫
+  ctx.fillStyle='#34435f';
+  for(const w of state.maze)ctx.fillRect(w.x,w.y,w.w,w.h);
+  // 传送门
+  if(state.portals)for(const po of state.portals){
+    ctx.save();ctx.translate(po.x,po.y);
+    ctx.strokeStyle='#61d6c5';ctx.lineWidth=3;
+    ctx.beginPath();ctx.arc(0,0,18,0,Math.PI*2);ctx.stroke();
+    ctx.strokeStyle='#61d6c566';
+    ctx.beginPath();ctx.arc(0,0,11,0,Math.PI*2);ctx.stroke();
+    ctx.restore();
+  }
+  // 地图道具（公共可见）
+  if(state.items)for(const it of state.items){
+    ctx.save();ctx.translate(it.x,it.y);
+    ctx.fillStyle='#222e45';ctx.strokeStyle='#ffbd69';ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(0,0,13,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#ffbd69';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    const ic={heal:'血',speed:'速',scatter:'散',freeze:'冰',bounce:'弹'}[it.type]||'?';
+    ctx.fillText(ic,0,1);
+    ctx.restore();
+  }
+  // 子弹
+  if(state.bullets)for(const b of state.bullets){
+    ctx.fillStyle=colors[b.owner];
+    ctx.beginPath();ctx.arc(b.x,b.y,4,0,Math.PI*2);ctx.fill();
+  }
+  // 坦克
+  drawTank(state.players[0],0,role===0);
+  drawTank(state.players[1],1,role===1);
+  // 结束画面
+  if(state.over){
+    ctx.fillStyle='#000a';ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#edf3ff';ctx.font='bold 34px sans-serif';ctx.textAlign='center';
+    const mine=role===0?0:1;
+    ctx.fillText(state.winner===-1?'平局':(state.winner===mine?'🏆 你赢了！':'对方获胜'),W/2,H/2-16);
+    ctx.font='15px sans-serif';
+    ctx.fillText('按 空格 准备重开（双方都要按）',W/2,H/2+20);
+  }
+}
+
+function updateGameUI(){
+  if(!state)return;
+  $('myscore').textContent=state.score[role===0?0:1];
+  $('opscore').textContent=state.score[role===0?1:0];
+  if(state.started && !state.over)$('gamestatus').textContent='进行中 · '+names[state.game];
+}
+
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(0.033,(now-last)/1000); last=now;
+  if(state&&state.started&&!state.over){
+    if(isHost||isSinglePlayer){
+      update(dt);
+      updateGameUI();
+    }
+    // 状态同步
+    if(!isSinglePlayer && conn && conn.open && now-lastSend>50){
+      lastSend=now;
+      if(isHost)send({type:'state',state});
+      else send({type:'input',input:getInput()});
+    }
+  }
+  draw();
+  raf=requestAnimationFrame(loop);
+}
+raf=requestAnimationFrame(loop);
+
+$('start').onclick=()=>hostStart();
+})();
+</script>
+</body>
+</html>
